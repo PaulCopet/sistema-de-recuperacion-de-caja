@@ -12,3 +12,4 @@ export interface Factura {
     total: number;
     status: 'online' | 'offline';
 }
+
