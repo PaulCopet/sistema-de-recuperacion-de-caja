@@ -99,6 +99,7 @@
 
 .modal-overlay {
     /* Aplica blur y baja un poco el brillo del fondo */
+    -webkit-backdrop-filter: blur(4px) brightness(80%);
     backdrop-filter: blur(4px) brightness(80%);
     /* Asegúrate de que cubra toda la pantalla */
     position: fixed;

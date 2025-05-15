@@ -26,7 +26,7 @@ export default function Main() {
     const [isOnline, setIsOnline] = useState(false);
     const [showFactModal, setShowFactModal] = useState(false);
     const [showStatsModal, setShowStatsModal] = useState(false);
-    const nodeRefs = useRef<Record<number, React.RefObject<HTMLDivElement>>>({});
+    const nodeRefs = useRef<Record<number, React.RefObject<HTMLDivElement | null>>>({});
     const [expanded, setExpanded] = useState<number[]>([]);
 
     // Notificación helper
