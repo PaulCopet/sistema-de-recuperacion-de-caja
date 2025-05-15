@@ -1,30 +1,36 @@
 [
     {
+        "id": 1,
         "codigo": "1234",
         "nombre": "Arroz",
         "precio": 5000
     },
     {
+        "id": 2,
         "codigo": "1245",
         "nombre": "Papa pastusa",
         "precio": 6000
     },
     {
+        "id": 3,
         "codigo": "1256",
         "nombre": "Margaritas",
         "precio": 7000
     },
     {
+        "id": 4,
         "codigo": "1237",
         "nombre": "Lentejas",
         "precio": 8000
     },
     {
+        "id": 5,
         "codigo": "2237",
         "nombre": "Salchipapa",
         "precio": 8000
     },
     {
+        "id": 6,
         "codigo": "2238",
         "nombre": "Lapiceros",
         "precio": 8000

@@ -1,6 +1,9 @@
 // src/pages/Main.tsx
-import { useEffect, useState } from 'react';
+import React from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import SearchBar from '../components/SearchBar';
+import { formatNumberCO } from '../utils/format';
 import ProductItem from '../components/ProductItem';
 import InvoiceSummary from '../components/InvoiceSummary';
 import Modal from '../components/Modal';
@@ -9,6 +12,9 @@ import Notification from '../components/Notification';
 import type { NotificationData } from '../components/Notification';
 import type { Producto, Factura } from '../types';
 import productosData from '../productos.json';
+
+// Mantiene un map de refs para cada factura/producto
+
 
 export default function Main() {
     const [productos] = useState<Producto[]>(productosData);
@@ -20,6 +26,8 @@ export default function Main() {
     const [isOnline, setIsOnline] = useState(false);
     const [showFactModal, setShowFactModal] = useState(false);
     const [showStatsModal, setShowStatsModal] = useState(false);
+    const nodeRefs = useRef<Record<number, React.RefObject<HTMLDivElement | null>>>({});
+    const [expanded, setExpanded] = useState<number[]>([]);
 
     // Notificación helper
     const pushNotif = (message: string, type: NotificationData['type'] = 'info') => {
@@ -28,6 +36,15 @@ export default function Main() {
     };
     const removeNotif = (id: number) => {
         setNotifs(nfs => nfs.filter(x => x.id !== id));
+    };
+
+    // mantiene qué facturas están expandidas
+    const toggleExpand = (id: number) => {
+        setExpanded(prev =>
+            prev.includes(id)
+                ? prev.filter(x => x !== id)
+                : [...prev, id]
+        );
     };
 
     // Sync offline → online
@@ -98,6 +115,8 @@ export default function Main() {
     const totalOnlineAmt = sentInv.reduce((s, x) => s + x.total, 0);
     const totalSavedAmt = savedInv.reduce((s, x) => s + x.total, 0);
 
+
+
     return (
         <div className="p-4 space-y-4">
             {/* Botones y estado */}
@@ -122,17 +141,40 @@ export default function Main() {
                 {/* Lista productos seleccionados */}
                 <div className="w-1/2">
                     <h2 className="text-xl font-semibold mb-2">Productos en la Factura</h2>
-                    <div className="space-y-1">
-                        {seleccionados.map((p, i) => (
-                            <ProductItem
-                                key={p.codigo}
-                                producto={p}
-                                index={i}
-                                onCantidadChange={cambiarCant}
-                                onEliminar={eliminar}
-                            />
-                        ))}
-                    </div>
+
+                    <TransitionGroup component="div" className="divide-y divide-gray-200">
+                        {seleccionados.map((p, i) => {
+                            // Si no existe, créalo y guarda en nodeRefs
+                            if (!nodeRefs.current[p.id]) {
+                                nodeRefs.current[p.id] = React.createRef<HTMLDivElement>();
+                            }
+                            const nodeRef = nodeRefs.current[p.id]!;
+
+                            return (
+                                <CSSTransition
+                                    key={p.id}
+                                    nodeRef={nodeRef}
+                                    timeout={300}
+                                    classNames="item"
+                                    onExited={() => {
+                                        // opcional: limpiar el ref una vez animado el exit
+                                        delete nodeRefs.current[p.id];
+                                    }}
+                                >
+                                    <div ref={nodeRef}>
+                                        <ProductItem
+                                            producto={p}
+                                            index={i}
+                                            onCantidadChange={cambiarCant}
+                                            onEliminar={eliminar}
+                                        />
+                                    </div>
+                                </CSSTransition>
+                            );
+                        })}
+                    </TransitionGroup>
+
+
                     <InvoiceSummary
                         total={seleccionados.reduce((s, x) => s + x.precio * (x.cantidad || 1), 0)}
                     />
@@ -160,16 +202,67 @@ export default function Main() {
 
             {/* Modal facturas locales */}
             <Modal isOpen={showFactModal} title="Facturas Locales" onClose={() => setShowFactModal(false)}>
-                {localInv.length === 0
-                    ? <p>No hay facturas locales.</p>
-                    : localInv.map(f => (
-                        <div key={f.id} className="border-b py-2">
-                            <p><strong>ID:</strong> {f.id}</p>
-                            <p><strong>Total:</strong> ${f.total.toFixed(2)}</p>
-                            <p><strong>Productos:</strong> {f.products.length}</p>
-                        </div>
-                    ))
-                }
+
+                {localInv.length === 0 ? (
+                    <p className="text-center text-gray-500">No hay facturas locales.</p>
+                ) : (
+                    <div className="flex flex-col items-center space-y-4">
+                        {localInv.map(inv => {
+                            const isOpen = expanded.includes(inv.id);
+                            return (
+                                <div
+                                    key={inv.id}
+                                    className={`
+                                    bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-4
+                                    w-full max-w-md
+                                    ${isOpen ? 'ring-2 ring-indigo-300' : ''}
+                                    flex flex-col 
+                                    `}
+                                >
+                                    {/* Header de la tarjeta */}
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <p className="font-semibold">Factura #{inv.id}</p>
+                                            <p className="text-gray-600">
+                                                Total: <span className="font-medium">{formatNumberCO(inv.total)}</span>
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => toggleExpand(inv.id)}
+                                            className={`
+                                                w-8 h-8 flex items-center justify-center text-xl font-bold
+                                                bg-indigo-100 rounded-full hover:bg-indigo-200 transition-colors
+                                            `}
+                                            aria-label={isOpen ? 'Colapsar detalles' : 'Ver detalles'}
+                                        >
+                                            {isOpen ? '–' : '+'}
+                                        </button>
+                                    </div>
+
+                                    {/* Detalles: lista de productos */}
+
+                                    {isOpen && (
+                                        <ul className="mt-3 space-y-2 w-full max-h-48 overflow-auto">
+                                            {inv.products.map(p => (
+                                                <li
+                                                    key={p.codigo}
+                                                    className="flex justify-between text-gray-700 text-sm px-2"
+                                                >
+                                                    <span className="flex-1 text-left">{p.codigo} – {p.nombre}</span>
+                                                    <span className="w-12 text-center">x{p.cantidad}</span>
+                                                    <span className="w-20 text-center">{formatNumberCO(p.precio)}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+
+
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
             </Modal>
 
             {/* Modal estadísticas */}
