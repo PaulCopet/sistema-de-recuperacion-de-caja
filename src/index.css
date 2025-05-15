@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@keyframes slide-in {
+    from {
+        transform: translateX(100%);
+        opacity: 0
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1
+    }
+}
+
+.animate-slide-in {
+    animation: slide-in 0.3s ease-out;
+}
+
+@keyframes fade-out {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+.fade-out {
+    animation: fade-out 0.3s ease-out forwards;
+}
+
+.notification .close-btn {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.5rem;
+    font-size: 1.25rem;
+    cursor: pointer;
+    line-height: 1;
+}

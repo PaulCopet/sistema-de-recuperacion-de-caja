@@ -1,0 +1,32 @@
+[
+    {
+        "codigo": "1234",
+        "nombre": "Arroz",
+        "precio": 5000
+    },
+    {
+        "codigo": "1245",
+        "nombre": "Papa pastusa",
+        "precio": 6000
+    },
+    {
+        "codigo": "1256",
+        "nombre": "Margaritas",
+        "precio": 7000
+    },
+    {
+        "codigo": "1237",
+        "nombre": "Lentejas",
+        "precio": 8000
+    },
+    {
+        "codigo": "2237",
+        "nombre": "Salchipapa",
+        "precio": 8000
+    },
+    {
+        "codigo": "2238",
+        "nombre": "Lapiceros",
+        "precio": 8000
+    }
+]
