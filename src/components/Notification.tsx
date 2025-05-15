@@ -1,3 +1,4 @@
+// src/components/Notification.tsx
 import { useEffect, useState } from 'react';
 
 export interface NotificationData {
@@ -27,29 +28,43 @@ export default function Notification({ notif, onDone }: Props) {
         }
     };
 
-    const bg =
-        notif.type === 'success' ? 'bg-green-500' :
-            notif.type === 'error' ? 'bg-red-500' :
+    const bgClass =
+        notif.type === 'success' ? 'bg-green-500 text-white' :
+            notif.type === 'error' ? 'bg-red-500 text-white' :
                 notif.type === 'warning' ? 'bg-yellow-400 text-black' :
                     'bg-blue-500';
 
     return (
         <div
             className={`
-        notification ${bg} text-white p-4 rounded shadow mb-2
+        notification ${bgClass} rounded-2xl text-shadow-2xs text-[1.1rem] shadow p-4 mb-2
+        flex items-center justify-between
         animate-slide-in
         ${visible ? '' : 'fade-out'}
-      `}
+        `}
             onAnimationEnd={handleAnimationEnd}
         >
+            <span>{notif.message}</span>
             <button
-                className="close-btn text-white bg-amber-50 h-full"
+                className="ml-4 font-bold text-xl leading-none focus:outline-none"
                 onClick={() => setVisible(false)}
                 aria-label="Cerrar notificación"
             >
-                &times;
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                    />
+                </svg>
             </button>
-            {notif.message}
         </div>
     );
 }
