@@ -84,7 +84,7 @@ export default function Main() {
     // Agregar producto
     const agregar = (p: Producto) => {
         setSeleccionados(sel => {
-            const idx = sel.findIndex(x => x.codigo === p.codigo);
+            const idx = sel.findIndex(x => x.code === p.code);
             if (idx !== -1) {
                 const copia = [...sel];
                 copia[idx].cantidad!++;
@@ -102,7 +102,7 @@ export default function Main() {
 
     // Generar pago
     const generarPago = () => {
-        const total = seleccionados.reduce((sum, x) => sum + x.precio * (x.cantidad || 1), 0);
+        const total = seleccionados.reduce((sum, x) => sum + x.price_und * (x.cantidad || 1), 0);
         const inv: Factura = { id: Date.now(), products: seleccionados, total, status: isOnline ? 'online' : 'offline' };
         if (isOnline) setSentInv(si => [...si, inv]), pushNotif('Factura enviada', 'success');
         else if (localInv.length < 20) setLocalInv(li => [...li, inv]), pushNotif('Guardada localmente', 'warning');
@@ -176,7 +176,7 @@ export default function Main() {
 
 
                     <InvoiceSummary
-                        total={seleccionados.reduce((s, x) => s + x.precio * (x.cantidad || 1), 0)}
+                        total={seleccionados.reduce((s, x) => s + x.price_und * (x.cantidad || 1), 0)}
                     />
                     <button
                         onClick={generarPago}
@@ -245,12 +245,12 @@ export default function Main() {
                                         <ul className="mt-3 space-y-2 w-full max-h-48 overflow-auto">
                                             {inv.products.map(p => (
                                                 <li
-                                                    key={p.codigo}
+                                                    key={p.code}
                                                     className="flex justify-between text-gray-700 text-sm px-2"
                                                 >
-                                                    <span className="flex-1 text-left">{p.codigo} – {p.nombre}</span>
+                                                    <span className="flex-1 text-left">{p.code} – {p.name}</span>
                                                     <span className="w-12 text-center">x{p.cantidad}</span>
-                                                    <span className="w-20 text-center">{formatNumberCO(p.precio)}</span>
+                                                    <span className="w-20 text-center">{formatNumberCO(p.price_und)}</span>
                                                 </li>
                                             ))}
                                         </ul>

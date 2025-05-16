@@ -16,7 +16,7 @@ export default function ProductItem({ producto, index, onCantidadChange, onElimi
         <div className={`${bgClass} flex items-center justify-between p-3 rounded-lg`}>
             {/* Nombre y código */}
             <div className="flex-1 text-left text-[1.2rem]">
-                {producto.codigo} – {producto.nombre}
+                {producto.code} – {producto.name}
             </div>
 
             {/* Controles de cantidad */}
@@ -40,7 +40,7 @@ export default function ProductItem({ producto, index, onCantidadChange, onElimi
             {/* Precio  formateado */}
             <div className="flex-1 text-center text-[1.2rem] ">
                 {/* Quitamos el dólar manual y usamos formatNumberCO */}
-                $ {formatNumberCO(producto.precio * cantidad, 0)}
+                $ {formatNumberCO(producto.price_und * cantidad, 0)}
             </div>
 
             {/* Botón eliminar */}
