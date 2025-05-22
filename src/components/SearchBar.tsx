@@ -23,7 +23,7 @@ export default function SearchBar({ onAgregar }: Props) {
                 const data = await response.json();
                 setProductos(data);
             } catch (error) {
-                
+
                 console.error("Error fetching productos:", error);
             } finally {
                 setLoading(false);
@@ -34,8 +34,7 @@ export default function SearchBar({ onAgregar }: Props) {
     }, []);
 
     const sugerencias = productos.filter(p =>
-        p.code ||
-        p.name
+        p.code.toLowerCase().includes(query.toLowerCase()) || p.name.toLowerCase().includes(query.toLowerCase())
     );
 
     if (loading) return <div>Buscando productos...</div>;
@@ -50,7 +49,7 @@ export default function SearchBar({ onAgregar }: Props) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
             />
-            
+
             {query && (
                 <ul className="absolute z-10 w-full border rounded bg-white shadow-lg max-h-60 overflow-auto">
                     {sugerencias.length > 0 ? (

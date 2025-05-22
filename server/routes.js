@@ -39,7 +39,6 @@ router.get("/facturas/:id", async (req, res) => {
 router.post("/facturas", async (req, res) => {
   try {
     const { bill, products } = req.body;
-    
     // Calcular totales
     let totalPrice = 0;
     let totalProducts = 0;
