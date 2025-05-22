@@ -11,13 +11,12 @@ import StatsChart from '../components/StatsChart';
 import Notification from '../components/Notification';
 import type { NotificationData } from '../components/Notification';
 import type { Producto, Factura } from '../types';
-import productosData from '../productos.json';
 
 // Mantiene un map de refs para cada factura/producto
 
 
 export default function Main() {
-    const [productos] = useState<Producto[]>(productosData);
+    const [productos, setProductos] = useState<Producto[]>([]);
     const [seleccionados, setSeleccionados] = useState<Producto[]>([]);
     const [notifs, setNotifs] = useState<NotificationData[]>([]);
     const [localInv, setLocalInv] = useState<Factura[]>(() => JSON.parse(localStorage.getItem('invoices') || '[]'));
@@ -47,32 +46,77 @@ export default function Main() {
         );
     };
 
-    // Sync offline → online
     const syncInvoices = async () => {
-        // Hacemos una copia del array al inicio
         const porSincronizar = [...localInv];
+
         for (const inv of porSincronizar) {
-            if (!isOnline) break;              // Si volvemos a offline, interrumpimos
-            // simulamos delay de red
+            if (!isOnline) break;
             await new Promise(r => setTimeout(r, 500));
 
-            // Eliminamos la factura sincronizada de localInv
-            setLocalInv(prev => prev.filter(x => x.id !== inv.id));
-            // Añadimos a sentInv con status online
-            setSentInv(prev => [...prev, { ...inv, status: 'online' }]);
-            // Guardamos en savedInv
-            setSavedInv(prev => [...prev, inv]);
+            try {
+                const response = await fetch("http://localhost:3000/facturas", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(inv)
+                });
 
-            // Notificación de éxito
-            pushNotif(`Factura #${inv.id} sincronizada`, 'success');
+                if (!response.ok) throw new Error("Error al sincronizar factura");
+
+                await response.json();
+
+                // Si el POST fue exitoso:
+                setLocalInv(prev => prev.filter(x => x.id !== inv.id));
+                setSentInv(prev => [...prev, { ...inv, status: 'online' }]);
+                setSavedInv(prev => [...prev, inv]);
+                pushNotif(`Factura #${inv.bill?.number} sincronizada`, 'success');
+
+            } catch (error) {
+                console.error("Error al sincronizar factura:", error);
+                pushNotif(`Error al sincronizar factura #${inv.bill?.number}`, 'error');
+            }
         }
     };
+
 
     useEffect(() => {
         localStorage.setItem('invoices', JSON.stringify(localInv));
         localStorage.setItem('sentInvoices', JSON.stringify(sentInv));
         localStorage.setItem('savedInvoices', JSON.stringify(savedInv));
     }, [localInv, sentInv, savedInv]);
+    useEffect(() => {
+        const cargarProductos = async () => {
+            if (navigator.onLine) {
+                try {
+                    const res = await fetch("http://localhost:3000/productos");
+                    if (!res.ok) throw new Error("Error al obtener productos");
+                    const data = await res.json();
+                    setProductos(data);
+                    localStorage.setItem("productosOffline", JSON.stringify(data));
+                    pushNotif("Productos cargados desde servidor", "success");
+                } catch (error) {
+                    console.warn("Fallo al cargar desde el backend. Usando productos locales.");
+                    const local = localStorage.getItem("productosOffline");
+                    if (local) {
+                        setProductos(JSON.parse(local));
+                        pushNotif("Productos cargados desde almacenamiento local", "info");
+                    } else {
+                        pushNotif("No hay productos disponibles", "error");
+                    }
+                }
+            } else {
+                const local = localStorage.getItem("productosOffline");
+                if (local) {
+                    setProductos(JSON.parse(local));
+                    pushNotif("Productos cargados en modo offline", "info");
+                } else {
+                    pushNotif("No hay productos disponibles en modo offline", "error");
+                }
+            }
+        };
+
+        cargarProductos();
+    }, []);
+
 
     // Estado online/offline
     const toggleOnline = () => {
@@ -100,20 +144,68 @@ export default function Main() {
         setSeleccionados(sel => sel.filter((_, idx) => idx !== i));
     };
 
-    // Generar pago
-    const generarPago = () => {
-        const total = seleccionados.reduce((sum, x) => sum + x.price_und * (x.cantidad || 1), 0);
-        const inv: Factura = { id: Date.now(), products: seleccionados, total, status: isOnline ? 'online' : 'offline' };
-        if (isOnline) setSentInv(si => [...si, inv]), pushNotif('Factura enviada', 'success');
-        else if (localInv.length < 20) setLocalInv(li => [...li, inv]), pushNotif('Guardada localmente', 'warning');
-        else pushNotif('Límite de facturas locales alcanzado', 'error');
-        setSeleccionados([]);
+    const generarPago = async () => {
+        if (seleccionados.length === 0) {
+            pushNotif("Agrega productos a la factura", "error");
+            return;
+        }
+
+        const nuevaFactura: Factura = {
+            id: Date.now(), // id temporal para gestión local
+            bill: {
+                number: `FAC-${Date.now()}`,
+                status: "Pendiente",
+                totalPrice: seleccionados.reduce((sum, p) => sum + p.price_und * (p.cantidad || 1), 0),
+                totalProducts: seleccionados.reduce((sum, p) => sum + (p.cantidad || 1), 0),
+                fecha: new Date()
+            },
+            products: seleccionados.map(p => ({
+                name: p.name,
+                producto: String(p._id || p.id),  // <-- aquí convertimos a string
+                quantity: p.cantidad || 1,
+                price_und: p.price_und,
+            }))
+
+        };
+
+        if (!isOnline) {
+            // OFFLINE: Guardar localmente
+            setLocalInv(prev => [...prev, nuevaFactura]);
+            pushNotif("Factura guardada localmente", "success");
+            setSeleccionados([]);
+            return;
+        }
+
+        // ONLINE: Enviar a backend
+        try {
+            const response = await fetch("http://localhost:3000/facturas", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(nuevaFactura)
+            });
+
+            if (!response.ok) throw new Error("Error al generar la factura");
+
+            await response.json();
+
+            // Actualizamos estados: enviada y guardada
+            setSentInv(prev => [...prev, { ...nuevaFactura, status: 'online' }]);
+            setSavedInv(prev => [...prev, nuevaFactura]);
+
+            pushNotif("Factura enviada exitosamente al servidor", "success");
+            setSeleccionados([]);
+        } catch (error) {
+            console.error("Error al generar factura:", error);
+            pushNotif("Error al generar factura", "error");
+        }
     };
 
+
     // Totales para la gráfica
-    const totalOfflineAmt = localInv.reduce((s, x) => s + x.total, 0);
-    const totalOnlineAmt = sentInv.reduce((s, x) => s + x.total, 0);
-    const totalSavedAmt = savedInv.reduce((s, x) => s + x.total, 0);
+    const totalOfflineAmt = localInv.reduce((s, x) => s + (x.bill?.totalPrice || 0), 0);
+    const totalOnlineAmt = sentInv.reduce((s, x) => s + (x.bill?.totalPrice || 0), 0);
+    const totalSavedAmt = savedInv.reduce((s, x) => s + (x.bill?.totalPrice || 0), 0);
+
 
 
 
@@ -189,7 +281,7 @@ export default function Main() {
                 {/* Buscador */}
                 <div className="w-1/2">
                     <h2 className="text-xl font-semibold mb-2">Agregar Producto</h2>
-                    <SearchBar productos={productos} onAgregar={agregar} />
+                    <SearchBar onAgregar={agregar} />
                 </div>
             </div>
 
@@ -203,72 +295,63 @@ export default function Main() {
             {/* Modal facturas locales */}
             <Modal isOpen={showFactModal} title="Facturas Locales" onClose={() => setShowFactModal(false)}>
 
-                {localInv.length === 0 ? (
-                    <p className="text-center text-gray-500">No hay facturas locales.</p>
-                ) : (
-                    <div className="flex flex-col items-center space-y-4">
-                        {localInv.map(inv => {
-                            const isOpen = expanded.includes(inv.id);
-                            return (
-                                <div
-                                    key={inv.id}
-                                    className={`
-                                    bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-4
-                                    w-full max-w-md
-                                    ${isOpen ? 'ring-2 ring-indigo-300' : ''}
-                                    flex flex-col 
-                                    `}
-                                >
-                                    {/* Header de la tarjeta */}
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="font-semibold">Factura #{inv.id}</p>
-                                            <p className="text-gray-600">
-                                                Total: <span className="font-medium">{formatNumberCO(inv.total)}</span>
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={() => toggleExpand(inv.id)}
-                                            className={`
-                                                w-8 h-8 flex items-center justify-center text-xl font-bold
-                                                bg-indigo-100 rounded-full hover:bg-indigo-200 transition-colors
-                                            `}
-                                            aria-label={isOpen ? 'Colapsar detalles' : 'Ver detalles'}
-                                        >
-                                            {isOpen ? '–' : '+'}
-                                        </button>
-                                    </div>
-
-                                    {/* Detalles: lista de productos */}
-
-                                    {isOpen && (
-                                        <ul className="mt-3 space-y-2 w-full max-h-48 overflow-auto">
-                                            {inv.products.map(p => (
-                                                <li
-                                                    key={p.code}
-                                                    className="flex justify-between text-gray-700 text-sm px-2"
-                                                >
-                                                    <span className="flex-1 text-left">{p.code} – {p.name}</span>
-                                                    <span className="w-12 text-center">x{p.cantidad}</span>
-                                                    <span className="w-20 text-center">{formatNumberCO(p.price_und)}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-
-
+                {localInv.map(inv => {
+                    const isOpen = expanded.includes(inv.id);
+                    return (
+                        <div
+                            key={inv.id}
+                            className={`
+                bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-4
+                w-full max-w-md
+                ${isOpen ? 'ring-2 ring-indigo-300' : ''}
+                flex flex-col 
+            `}
+                        >
+                            {/* Header de la tarjeta */}
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="font-semibold">Factura #{inv.bill?.number}</p>
+                                    <p className="text-gray-600">
+                                        Total: <span className="font-medium">{formatNumberCO(inv.bill?.totalPrice || 0)}</span>
+                                    </p>
                                 </div>
-                            );
-                        })}
-                    </div>
-                )}
+                                <button
+                                    onClick={() => toggleExpand(inv.id)}
+                                    className={`
+                        w-8 h-8 flex items-center justify-center text-xl font-bold
+                        bg-indigo-100 rounded-full hover:bg-indigo-200 transition-colors
+                    `}
+                                    aria-label={isOpen ? 'Colapsar detalles' : 'Ver detalles'}
+                                >
+                                    {isOpen ? '–' : '+'}
+                                </button>
+                            </div>
+
+                            {/* Detalles: lista de productos */}
+                            {isOpen && (
+                                <ul className="mt-3 space-y-2 w-full max-h-48 overflow-auto">
+                                    {inv.products.map((p, idx) => (
+                                        <li
+                                            key={idx}
+                                            className="flex justify-between text-gray-700 text-sm px-2"
+                                        >
+                                            <span className="flex-1 text-left">{p.name}</span>
+                                            <span className="w-12 text-center">x{p.quantity}</span>
+                                            <span className="w-20 text-center">{formatNumberCO(p.price_und)}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    );
+                })}
 
             </Modal>
 
             {/* Modal estadísticas */}
             <Modal isOpen={showStatsModal} title="Estadísticas" onClose={() => setShowStatsModal(false)}>
                 <StatsChart
-                    onlineCount={sentInv.filter(i => i.status === 'online').length}
+                    onlineCount={sentInv.filter(i => i.bill?.status === 'Enviado').length}
                     offlineCount={localInv.length}
                     savedCount={savedInv.length}
                     onlineAmount={totalOnlineAmt}
@@ -276,6 +359,7 @@ export default function Main() {
                     savedAmount={totalSavedAmt}
                 />
             </Modal>
+
         </div>
     );
 }

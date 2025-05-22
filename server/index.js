@@ -9,7 +9,7 @@ const app = express();
 dotenv.config();
 app.use(cors());
 app.use(express.json());
-
+app.use(facturasRouter);
 // Variables de entorno
 const PORT = process.env.PORT || 3000;
 const MONGOURL = process.env.MONGODB_URL;
@@ -41,6 +41,10 @@ const productos = new mongoose.Schema({
 });
 
 const productoFacturaSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true
+    },
     producto: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Product",
